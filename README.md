@@ -5,6 +5,7 @@
 
 ## 開發環境
 OS: Windows10
+
 Python: 3.11.1
 
 ## Installation
