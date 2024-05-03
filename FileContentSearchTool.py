@@ -1,4 +1,5 @@
 import os
+import re
 from PyPDF2 import PdfReader
 from pptx import Presentation
 import customtkinter as ctk
@@ -94,7 +95,6 @@ class FolderSearchApp(ctk.CTk):
         for folder in self.folder_list:
             self.folder_listbox.insert(0, folder)
 
-    # 搜尋功能
     def search(self):
         keyword = self.search_entry.get()
         if not keyword:
@@ -179,6 +179,7 @@ class FolderSearchApp(ctk.CTk):
             selected_text = self.search_results.get(selected_index)
             selected_file_path = self.file_path_mapping.get(selected_text)
             if selected_file_path:
+                selected_file_path = re.sub(r"/", r"\\", selected_file_path)
                 os.startfile(selected_file_path)
 
     def save_folders(self):
