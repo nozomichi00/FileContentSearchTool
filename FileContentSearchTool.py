@@ -11,7 +11,7 @@ class FolderSearchApp(ctk.CTk):
         super().__init__()
 
         self.title("File Content Search Tool")
-        self.geometry("600x800")
+        self.geometry("1024x800")
 
         self.file_path_mapping = {}
         self.folder_list = []
@@ -67,11 +67,11 @@ class FolderSearchApp(ctk.CTk):
 
         self.search_results.config(yscrollcommand=self.search_scrollbar.set)
 
-        self.progress_bar = ctk.CTkProgressBar(self, height=20, progress_color="#90EE90")  # 設定高度為 20
+        self.search_results.bind("<Double-Button-1>", self.open_file)
+
+        self.progress_bar = ctk.CTkProgressBar(self, height=20, progress_color="#90EE90")
         self.progress_bar.pack(fill=ctk.X, padx=self.winfo_width() * 0.025, pady=(5, 5))
         self.progress_bar.set(0)
-
-        self.search_results.bind("<Double-Button-1>", self.open_file)
 
     def add_folder(self):
         folder_path = filedialog.askdirectory()
@@ -101,14 +101,16 @@ class FolderSearchApp(ctk.CTk):
             messagebox.showwarning("Warning", "請輸入關鍵字進行搜索。")
             return
 
-        keyword = keyword.lower()
+        # 將關鍵字轉換為小寫，以進行區分大小寫的搜索
+        keyword_lower = keyword.lower()
 
+        # 清空搜索結果列表框
         self.search_results.delete(0, END)
 
-        # 用於跟蹤已添加到搜索結果中的文件路徑
+        # 用於跟蹤已找到的文件
         found_files = set()
 
-        # 計算檔案數量用於進度條
+        # 計算所有文件總數，用於進度條
         total_files = 0
         for folder in self.folder_list:
             for root, dirs, files in os.walk(folder):
@@ -116,12 +118,11 @@ class FolderSearchApp(ctk.CTk):
         
         processed_files = 0
 
-        # 遍歷資料夾清單框
+        # 遍歷文件夾列表
         for folder in self.folder_list:
-            # 遍歷每個資料夾
             for root, dirs, files in os.walk(folder):
-                # 遍歷資料夾中的文件
                 for file in files:
+                    # 進行文件處理計數
                     processed_files += 1
                     progress = processed_files / total_files
                     self.progress_bar.set(progress)
@@ -129,44 +130,75 @@ class FolderSearchApp(ctk.CTk):
 
                     if file.endswith(".pdf") or file.endswith(".pptx"):
                         file_path = os.path.join(root, file)
-                        # 確保文件尚未被添加到搜索結果(避免單個檔案不同頁面都有出現關鍵字導致搜尋結果框出現一樣的檔案)
                         if file_path not in found_files:
-                            # Test Code
-                            # print(f"Processing file: {file_path}")
                             try:
-                                # 處理 PDF 檔案
                                 if file.endswith(".pdf"):
+                                    # 處理PDF文件
                                     reader = PdfReader(file_path)
                                     for page_num, page in enumerate(reader.pages):
-                                        text = page.extract_text()
-                                        text = text.lower()
-                                        if keyword in text:
-                                            file_name = os.path.basename(file_path)
-                                            result_text = f"檔案類型: PDF, 檔案名稱: {file_name}"
-                                            self.search_results.insert(END, result_text)
+                                        # 提取原始文本，不轉換為小寫
+                                        original_text = page.extract_text()
 
-                                            self.file_path_mapping[result_text] = file_path
-                                            found_files.add(file_path)
+                                        # 將原始文本轉換為小寫以進行搜索匹配
+                                        text = original_text.lower()
+
+                                        # 檢查關鍵字是否存在於文本中
+                                        if keyword_lower in text:
+                                            lines = original_text.split("\n")
+                                            # 遍歷每一行，找到包含關鍵字的行
+                                            for line in lines:
+                                                if keyword in line:
+                                                    file_name = os.path.basename(file_path)
+                                                    # 顯示原始字串
+                                                    result_text = f"檔案名稱: {file_name}、原始字串「{line}」"
+                                                    self.search_results.insert(END, result_text)
+
+                                                    # 保存結果與文件路徑的映射
+                                                    self.file_path_mapping[result_text] = file_path
+                                                    found_files.add(file_path)
+                                                    break  # 找到匹配行後跳出
+
+                                        # 如果找到匹配文件，則結束當前頁面的搜索
+                                        if file_path in found_files:
                                             break
-                                # 處理 PPT 檔案
+
                                 elif file.endswith(".pptx"):
+                                    # 處理PPT文件
                                     presentation = Presentation(file_path)
                                     for slide_num, slide in enumerate(presentation.slides):
-                                        text = []
+                                        # 提取原始文本，不轉換為小寫
+                                        original_text = []
+
                                         for shape in slide.shapes:
                                             if shape.has_text_frame:
-                                                text.append(shape.text_frame.text)
-                                        slide_text = " ".join(text).lower()
-                                        if keyword in slide_text:
-                                            file_name = os.path.basename(file_path)
-                                            result_text = f"檔案類型: PPT, 檔案名稱: {file_name}"
-                                            self.search_results.insert(END, result_text)
-                                            
-                                            self.file_path_mapping[result_text] = file_path
-                                            found_files.add(file_path)
+                                                original_text.append(shape.text_frame.text)
+                                        slide_text = " ".join(original_text)
+
+                                        # 將原始文本轉換為小寫以進行搜索匹配
+                                        text_lower = slide_text.lower()
+
+                                        # 檢查關鍵字是否存在於文本中
+                                        if keyword_lower in text_lower:
+                                            lines = slide_text.split("\n")
+                                            # 遍歷每一行，找到包含關鍵字的行
+                                            for line in lines:
+                                                if keyword in line:
+                                                    file_name = os.path.basename(file_path)
+                                                    # 顯示原始字串
+                                                    result_text = f"檔案名稱: {file_name}、原始字串「{line}」"
+                                                    self.search_results.insert(END, result_text)
+
+                                                    # 保存結果與文件路徑的映射
+                                                    self.file_path_mapping[result_text] = file_path
+                                                    found_files.add(file_path)
+                                                    break  # 找到匹配行後跳出
+                                        
+                                        # 如果找到匹配文件，則結束當前頁面的搜索
+                                        if file_path in found_files:
                                             break
+                                            
                             except Exception as e:
-                                messagebox.showinfo(f"Error", "processing file: {file_path}/Exception: {e}")
+                                messagebox.showinfo(f"Error", f"處理文件時出現錯誤：{file_path}\n錯誤原因：{e}")
 
         if not self.search_results.size():
             messagebox.showinfo("Information", "搜索完畢，但結果是空的。")
